@@ -77,7 +77,7 @@ start_time = st.slider(
     min_value=dt(2020, 1, 1, 0, 0), 
     max_value=dt(2020, 1, 7, 23, 0),
     value=dt(2020, 1, 3, 12, 0),
-    step=datetime.timedelta(hours=1),
+    step=datetime.timedelta(days=1),
     format="MM/DD/YY - HH:mm")
 st.write("선택한 약속 시간:", start_time)
 

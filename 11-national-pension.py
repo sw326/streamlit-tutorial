@@ -13,50 +13,53 @@ plt.rcParams['font.family'] = "AppleGothic"
 # plt.rcParams['font.family'] = "NanumGothic"
 plt.rcParams['axes.unicode_minus'] = False
 
+
 class PensionData():
     def __init__(self, filepath):
         self.df = pd.read_csv(os.path.join(filepath), encoding='cp949')
-        self.pattern1 = '(\([^)]+\))'
-        self.pattern2 = '(\[[^)]+\])'
+        self.pattern1 = r'(\([^)]+\))'
+        self.pattern2 = r'(\[[^)]+\])'
         self.pattern3 = '[^A-Za-z0-9가-힣]'
         self.preprocess()
-          
+
     def preprocess(self):
         self.df.columns = [
             '자료생성년월', '사업장명', '사업자등록번호', '가입상태', '우편번호',
-            '사업장지번상세주소', '주소', '고객법정동주소코드', '고객행정동주소코드', 
-            '시도코드', '시군구코드', '읍면동코드', 
-            '사업장형태구분코드 1 법인 2 개인', '업종코드', '업종코드명', 
+            '사업장지번상세주소', '주소', '고객법정동주소코드', '고객행정동주소코드',
+            '시도코드', '시군구코드', '읍면동코드',
+            '사업장형태구분코드 1 법인 2 개인', '업종코드', '업종코드명',
             '적용일자', '재등록일자', '탈퇴일자',
             '가입자수', '금액', '신규', '상실'
         ]
-        df = self.df.drop(['자료생성년월', '우편번호', '사업장지번상세주소', '고객법정동주소코드', '고객행정동주소코드', '사업장형태구분코드 1 법인 2 개인', '적용일자', '재등록일자'], axis=1)
+        df = self.df.drop(['자료생성년월', '우편번호', '사업장지번상세주소', '고객법정동주소코드',
+                          '고객행정동주소코드', '사업장형태구분코드 1 법인 2 개인', '적용일자', '재등록일자'], axis=1)
         df['사업장명'] = df['사업장명'].apply(self.preprocessing)
-        df['탈퇴일자_연도'] =  pd.to_datetime(df['탈퇴일자']).dt.year
-        df['탈퇴일자_월'] =  pd.to_datetime(df['탈퇴일자']).dt.month
+        df['탈퇴일자_연도'] = pd.to_datetime(df['탈퇴일자']).dt.year
+        df['탈퇴일자_월'] = pd.to_datetime(df['탈퇴일자']).dt.month
         df['시도'] = df['주소'].str.split(' ').str[0]
-        df = df.loc[df['가입상태'] == 1].drop(['가입상태', '탈퇴일자'], axis=1).reset_index(drop=True)
+        df = df.loc[df['가입상태'] == 1].drop(
+            ['가입상태', '탈퇴일자'], axis=1).reset_index(drop=True)
         df['인당금액'] = df['금액'] / df['가입자수']
-        df['월급여추정'] =  df['인당금액'] / 9 * 100
+        df['월급여추정'] = df['인당금액'] / 9 * 100
         df['연간급여추정'] = df['월급여추정'] * 12
         self.df = df
 
-        
     def preprocessing(self, x):
         x = re.sub(self.pattern1, '', x)
         x = re.sub(self.pattern2, '', x)
         x = re.sub(self.pattern3, ' ', x)
         x = re.sub(' +', ' ', x)
         return x
-    
+
     def find_company(self, company_name):
-        return self.df.loc[self.df['사업장명'].str.contains(company_name), ['사업장명', '월급여추정', '연간급여추정', '업종코드', '가입자수']]\
-                  .sort_values('가입자수', ascending=False)
-    
+        return self.df.loc[self.df['사업장명'].str.contains(company_name), ['사업장명', '월급여추정', '연간급여추정', '업종코드', '가입자수']] \
+            .sort_values('가입자수', ascending=False)
+
     def compare_company(self, company_name):
         company = self.find_company(company_name)
         code = company['업종코드'].iloc[0]
-        df1 = self.df.loc[self.df['업종코드'] == code, ['월급여추정', '연간급여추정']].agg(['mean', 'count', 'min', 'max'])
+        df1 = self.df.loc[self.df['업종코드'] == code, ['월급여추정', '연간급여추정']].agg(
+            ['mean', 'count', 'min', 'max'])
         df1.columns = ['업종_월급여추정', '업종_연간급여추정']
         df1 = df1.T
         df1.columns = ['평균', '개수', '최소', '최대']
@@ -67,14 +70,17 @@ class PensionData():
     def company_info(self, company_name):
         company = self.find_company(company_name)
         return self.df.loc[company.iloc[0].name]
-        
+
     def get_data(self):
         return self.df
 
-@st.cache
+
+@st.cache_data
 def read_pensiondata():
-    data = PensionData('https://www.dropbox.com/s/nxeo1tziv05ejz7/national-pension.csv?dl=1')
+    data = PensionData(
+        'https://www.dropbox.com/s/nxeo1tziv05ejz7/national-pension.csv?dl=1')
     return data
+
 
 data = read_pensiondata()
 company_name = st.text_input('회사명을 입력해 주세요', placeholder='검색할 회사명 입력')
@@ -113,7 +119,7 @@ if data and company_name:
         percent_value = info['월급여추정'] / comp_output.iloc[0, 0] * 100 - 100
         diff_month = abs(comp_output.iloc[0, 0] - info['월급여추정'])
         diff_year = abs(comp_output.iloc[1, 0] - info['연간급여추정'])
-        upordown = '높은' if percent_value > 0 else '낮은' 
+        upordown = '높은' if percent_value > 0 else '낮은'
 
         st.markdown(f"""
         - 업종 **평균 월급여**는 `{int(comp_output.iloc[0, 0]):,}` 원, **평균 연봉**은 `{int(comp_output.iloc[1, 0]):,}` 원 입니다.
@@ -123,13 +129,15 @@ if data and company_name:
 
         fig, ax = plt.subplots(1, 2)
 
-        p1 = ax[0].bar(x=["Average", "Your Company"], height=(comp_output.iloc[0, 0], info['월급여추정']), width=0.7)
+        p1 = ax[0].bar(x=["Average", "Your Company"], height=(
+            comp_output.iloc[0, 0], info['월급여추정']), width=0.7)
         ax[0].bar_label(p1, fmt='%d')
         p1[0].set_color('black')
         p1[1].set_color('red')
         ax[0].set_title('Monthly Salary')
 
-        p2 = ax[1].bar(x=["Average", "Your Company"], height=(comp_output.iloc[1, 0], info['연간급여추정']), width=0.7)
+        p2 = ax[1].bar(x=["Average", "Your Company"], height=(
+            comp_output.iloc[1, 0], info['연간급여추정']), width=0.7)
         p2[0].set_color('black')
         p2[1].set_color('red')
         ax[1].bar_label(p2, fmt='%d')
@@ -144,10 +152,10 @@ if data and company_name:
 
         st.markdown('### 동종업계')
         df = data.get_data()
-        st.dataframe(df.loc[df['업종코드'] == info['업종코드'], ['사업장명', '월급여추정', '연간급여추정', '가입자수']]\
-            .sort_values('연간급여추정', ascending=False).head(10).round(0), 
-            use_container_width=True
-        )
-        
+        st.dataframe(df.loc[df['업종코드'] == info['업종코드'], ['사업장명', '월급여추정', '연간급여추정', '가입자수']]
+                     .sort_values('연간급여추정', ascending=False).head(10).round(0),
+                     use_container_width=True
+                     )
+
     else:
         st.subheader('검색결과가 없습니다')

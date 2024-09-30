@@ -1,18 +1,18 @@
-import openai
 import os
 import streamlit as st
 import requests
 from dotenv import load_dotenv
 from datetime import datetime, time
 from urllib.parse import quote
+from openai import OpenAI
 
 load_dotenv()
 
 # 한글 폰트 설정
 st.set_page_config(page_title="열려라 참깨", page_icon="🍽️")
 
-# OpenAI API 키 설정 (환경 변수에서 불러오기)
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# OpenAI 클라이언트 초기화
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # 카카오맵 REST API 키 설정 (환경 변수에서 불러오기)
 kakao_api_key = os.getenv("KAKAO_API_KEY")
@@ -22,7 +22,8 @@ def get_coordinates_kakao(address):
     # 주소를 URL 인코딩
     encoded_address = quote(address)
     # 카카오맵 API로 주소를 위도와 경도로 변환
-    url = f"https://dapi.kakao.com/v2/local/search/address.json?query={encoded_address}"
+    url = f"https://dapi.kakao.com/v2/local/search/address.json?query={
+        encoded_address}"
     headers = {"Authorization": f"KakaoAK {kakao_api_key}"}
     response = requests.get(url, headers=headers)
 
@@ -110,17 +111,20 @@ def get_bot_response(address=None, query=None):
                     info_str += f"**{idx}. {place_name}**\n"
                     info_str += f"- 주소: {place_address}\n"
                     info_str += f"- 거리: {distance:.2f} km\n"
-                    info_str += f"- <span style='color: {status_color}'>영업 상태: {business_status}</span>\n"
+                    info_str += f"- <span style='color: {
+                        status_color}'>영업 상태: {business_status}</span>\n"
                     info_str += f"- [지도보기]({place_url})\n\n"
 
                     # 영업 종료된 음식점 목록을 추가
-                    closed_info_str += f"- **{place_name}**: {place_address}(거리: {distance:.2f} km) - 영업 상태: {business_status}([지도보기]({place_url}))\n"
+                    closed_info_str += f"- **{place_name}**: {place_address}(거리: {distance:.2f} km) - 영업 상태: {
+                        business_status}([지도보기]({place_url}))\n"
 
                 # 모든 음식점이 영업 종료인 경우 빨간 글씨로 안내
                 if all_closed:
                     info_str = f"<span style='color:red;'>모든 음식점이 현재 영업 종료 상태입니다.</span>\n\n" + closed_info_str
             else:
-                info_str += f"입력한 위치로부터 반경 5km 이내의 '{{query}}' 관련 음식점 정보를 찾을 수 없습니다.\n"
+                info_str += f"입력한 위치로부터 반경 5km 이내의 '{
+                    query}' 관련 음식점 정보를 찾을 수 없습니다.\n"
         else:
             info_str += "유효한 주소를 입력해주세요.\n"
     elif address:
@@ -133,11 +137,12 @@ def get_bot_response(address=None, query=None):
         return "올바른 형식으로 입력해주세요. 예시: '서울특별시 종로구, 치킨'"
 
     # OpenAI GPT를 사용하여 응답 생성
-    prompt = f"사용자가 '{address}, {query}'에 대해 물어봤습니다. 다음은 제공된 정보입니다: \n{info_str}\n\n이 정보를 바탕으로 고객에게 친절하게 응답해주세요."
+    prompt = f"사용자가 '{address}, {query}'에 대해 물어봤습니다. 다음은 제공된 정보입니다: \n{
+        info_str}\n\n이 정보를 바탕으로 고객에게 친절하게 응답해주세요."
 
     try:
         st.write("OpenAI API 호출 중...")
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "당신은 친절한 챗봇입니다."},
@@ -146,7 +151,7 @@ def get_bot_response(address=None, query=None):
             max_tokens=150,
             temperature=0.7
         )
-        gpt_response = response.choices[0].message['content'].strip()
+        gpt_response = response.choices[0].message.content.strip()
         st.write("OpenAI API 응답 받음")
         return f"{info_str}\n\n**AI 응답**: {gpt_response}"
     except Exception as e:
